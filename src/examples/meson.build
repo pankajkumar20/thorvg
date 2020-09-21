@@ -25,6 +25,7 @@ source_file = [
     'testSvg.cpp',
     'testTransform.cpp',
     'testUpdate.cpp',
+    'testClipPath.cpp',
 ]
 
 foreach current_file : source_file
