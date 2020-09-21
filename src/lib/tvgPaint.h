@@ -35,6 +35,10 @@ namespace tvg
         virtual bool render(RenderMethod& renderer) = 0;
         virtual bool bounds(float* x, float* y, float* w, float* h) const = 0;
         virtual Paint* duplicate() = 0;
+        virtual bool composite(unique_ptr<Paint> comp, CompMethod method) = 0;
+        virtual bool composite(Paint* comp, CompMethod method) = 0;
+        virtual Paint* composite() = 0;
+        virtual CompMethod compositeMethod() = 0;
     };
 
     struct Paint::Impl
@@ -111,6 +115,15 @@ namespace tvg
             return true;
         }
 
+        Matrix transform()
+        {
+            if (rTransform) {
+                rTransform->update();
+                return rTransform->m;
+            }
+            return {1, 0, 0, 0, 1, 0, 0, 0, 1};
+        }
+
         bool bounds(float* x, float* y, float* w, float* h) const
         {
             return smethod->bounds(x, y, w, h);
@@ -163,6 +176,26 @@ namespace tvg
 
             return ret;
         }
+
+        bool composite(unique_ptr<Paint> comp, CompMethod method) const
+        {
+            return smethod->composite(move(comp), method);
+        }
+
+        bool composite(Paint* comp, CompMethod method) const
+        {
+            return smethod->composite(comp, method);
+        }
+
+        Paint* composite() const
+        {
+            return smethod->composite();
+        }
+
+        CompMethod compositeMethod() const
+        {
+            return smethod->compositeMethod();
+        }
     };
 
 
@@ -197,6 +230,26 @@ namespace tvg
         Paint* duplicate() override
         {
             return inst->duplicate();
+        }
+
+        bool composite(unique_ptr<Paint> comp, CompMethod method) override
+        {
+            return inst->composite(move(comp), method);
+        }
+
+        bool composite(Paint* comp, CompMethod method) override
+        {
+            return inst->composite(comp, method);
+        }
+
+        Paint* composite() override
+        {
+            return inst->composite();
+        }
+
+        CompMethod compositeMethod() override
+        {
+            return inst->compositeMethod();
         }
     };
 }
