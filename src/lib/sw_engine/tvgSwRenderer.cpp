@@ -38,6 +38,7 @@ struct SwTask : Task
     Matrix* compTransform = nullptr;
     SwSurface* surface = nullptr;
     RenderUpdateFlag flags = RenderUpdateFlag::None;
+    vector<Composite> compList;
 
     void run() override
     {
@@ -87,23 +88,17 @@ struct SwTask : Task
         }
 
         //Composite clip-path
-        if(compData && compMethod == CompMethod::ClipPath) {
-            SwShape compShape;
-            if (flags & (RenderUpdateFlag::Path | RenderUpdateFlag::Transform)) {
-                shapeReset(&compShape);
+        for (auto comp : compList) {
+             SwShape *compShape = &static_cast<SwTask*>(comp.compEData)->shape;
+             if(comp.method == CompMethod::ClipPath) {
+                  //Clip to fill(path) rle
+                  if (shape.rle && compShape->rect) rleClipRect(shape.rle, &compShape->bbox);
+                  else if (shape.rle && compShape->rle) rleClipPath(shape.rle, compShape->rle);
 
-                //Make composite rle
-                if (!shapePrepare(&compShape, compData, clip, compTransform)) return;
-                if (!shapeGenRle(&compShape, compData, clip, true)) return;
-
-                //Clip to fill(path) rle
-                if (shape.rle && compShape.rect) rleClipRect(shape.rle, &compShape.bbox);
-                else if (shape.rle && compShape.rle) rleClipPath(shape.rle, compShape.rle);
-
-                //Clip to stroke rle
-                if (shape.strokeRle && compShape.rect) rleClipRect(shape.strokeRle, &compShape.bbox);
-                else if (shape.strokeRle && compShape.rle) rleClipPath(shape.strokeRle, compShape.rle);
-            }
+                  //Clip to stroke rle
+                  if (shape.strokeRle && compShape->rect) rleClipRect(shape.strokeRle, &compShape->bbox);
+                  else if (shape.strokeRle && compShape->rle) rleClipPath(shape.strokeRle, compShape->rle);
+             }
         }
         shapeDelOutline(&shape);
     }
@@ -208,7 +203,7 @@ bool SwRenderer::dispose(TVG_UNUSED const Shape& sdata, void *data)
 }
 
 
-void* SwRenderer::prepare(const Shape& sdata, void* data, const RenderTransform* transform, RenderUpdateFlag flags)
+void* SwRenderer::prepare(const Shape& sdata, void* data, const RenderTransform* transform, vector<Composite>& compList, RenderUpdateFlag flags)
 {
     //prepare task
     auto task = static_cast<SwTask*>(data);
@@ -220,8 +215,10 @@ void* SwRenderer::prepare(const Shape& sdata, void* data, const RenderTransform*
     if (flags == RenderUpdateFlag::None || task->valid()) return task;
 
     task->sdata = &sdata;
-    task->compData = static_cast<Shape*>(task->sdata->composite());
-    task->compMethod = task->sdata->compositeMethod();
+    if (compList.size() > 0) {
+        for (auto comp : compList)  static_cast<SwTask*>(comp.compEData)->get();
+        task->compList.assign(compList.begin(), compList.end());
+    }
 
     if (transform) {
         if (!task->transform) task->transform = static_cast<Matrix*>(malloc(sizeof(Matrix)));
@@ -229,14 +226,6 @@ void* SwRenderer::prepare(const Shape& sdata, void* data, const RenderTransform*
     } else {
         if (task->transform) free(task->transform);
         task->transform = nullptr;
-    }
-
-    if (task->compData) {
-        if (!task->compTransform) task->compTransform = static_cast<Matrix*>(malloc(sizeof(Matrix)));
-        *task->compTransform = ((Shape*)task->compData)->transform();
-    } else {
-        if (task->compTransform) free(task->compTransform);
-        task->compTransform = nullptr;
     }
 
     task->surface = surface;

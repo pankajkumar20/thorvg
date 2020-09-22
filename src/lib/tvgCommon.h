@@ -42,6 +42,14 @@ using namespace tvg;
 
 #define TVG_UNUSED __attribute__ ((__unused__))
 
+namespace tvg
+{
+struct Composite {
+    void* compEData;
+    CompMethod method;
+};
+}
+
 #include "tvgBezier.h"
 #include "tvgLoader.h"
 #include "tvgLoaderMgr.h"
